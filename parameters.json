@@ -1,0 +1,47 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "sites_di_layer_name": {
+            "value": "null"
+        },
+          "minio_access_key":{
+           
+            "value":"null"
+        },
+        "minio_secret_key":{
+        
+            "value":"null"
+        },
+        "customer_data_blob_container_name":{
+        
+            "value":"null"
+        },
+         "customer_config_blob_container_name":{
+        
+             "value":"null"
+        },
+
+        "config_web_name": {    
+            "value": "null"
+        },
+        "storageAccounts_name": {
+            "value": "null"
+            
+        },
+        "serverfarms_app_svc_name": {
+            "value": "null"
+        },        
+        "docker_registery_server_name":{
+           "value": "null" 
+        },
+          "docker_registery_server_password":{
+        
+            "value": "null"
+        },
+          "docker_registery_server_url":{
+           
+            "value":"null"
+        }
+    }
+}

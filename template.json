@@ -1,0 +1,233 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "sites_di_layer_name": {
+            "defaultValue": "<updateme>",
+            "type": "String"
+        },
+        "config_web_name": {    
+            "defaultValue": "web",
+            "type": "String"
+        },
+        "storageAccounts_name": {
+            "defaultValue": "<updateme>",
+            "type": "String"
+        },
+        "serverfarms_app_svc_name": {
+            "defaultValue": "<updateme>",
+            "type": "String"
+        },        
+        "docker_registery_server_name":{
+           "type": "String",
+          "defaultValue": "<updateme>"
+        },
+          "docker_registery_server_password":{
+             "type": "String",
+            "defaultValue": "<updateme>"
+        },
+          "docker_registery_server_url":{
+             "type": "String",
+            "defaultValue":"<updateme>"
+        },
+          "minio_access_key":{
+            "type": "String",
+            "defaultValue":"<updateme>"
+        },
+        "minio_secret_key":{
+             "type": "String",
+            "defaultValue":"<updateme>"
+        },
+        "customer_data_blob_container_name":{
+             "type": "String",
+            "defaultValue":"<updateme>"
+        },
+         "customer_config_blob_container_name":{
+             "type": "String",
+             "defaultValue":"<updateme>"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "sku": {
+                "name": "Standard_RAGRS",
+                "tier": "Standard"
+            },
+            "kind": "StorageV2",
+            "name": "[parameters('storageAccounts_name')]",
+            "apiVersion": "2018-07-01",
+            "location": "eastus",
+            "properties": {
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "virtualNetworkRules": [],
+                    "ipRules": [],
+                    "defaultAction": "Allow"
+                },
+                "supportsHttpsTrafficOnly": true,
+                "encryption": {
+                    "services": {
+                        "file": {
+                            "enabled": true
+                        },
+                        "blob": {
+                            "enabled": true
+                        }
+                    },
+                    "keySource": "Microsoft.Storage"
+                },
+                "accessTier": "Hot"
+            },
+            "resources": [
+                {
+                    "name": "[concat('default/', parameters('customer_config_blob_container_name'))]",
+                    "type": "blobServices/containers",
+                    "apiVersion": "2018-07-01",
+                    "properties":{
+                        "publicAccess":"None"
+                    },
+                    "dependsOn": [
+                        "[parameters('storageAccounts_name')]"
+                    ]
+                },
+                {
+                    "name": "[concat('default/', parameters('customer_data_blob_container_name'))]",
+                    "type": "blobServices/containers",
+                    "apiVersion": "2018-07-01",
+                    "properties":{
+                        "publicAccess":"None"
+                    },
+                    "dependsOn": [
+                        "[parameters('storageAccounts_name')]"
+                    ]
+                }
+            ],
+            "dependsOn": []
+        },
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "sku": {
+                "name": "B1",
+                "tier": "Basic",
+                "size": "B1",
+                "family": "B",
+                "capacity": 1
+            },
+            "kind": "linux",
+            "name": "[parameters('serverfarms_app_svc_name')]",
+            "apiVersion": "2016-09-01",
+            "location": "East US",
+            "properties": {
+                "name": "[parameters('serverfarms_app_svc_name')]",
+                "reserved": true
+            },
+            "dependsOn": []
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "kind": "app,linux,container",
+            "name": "[parameters('sites_di_layer_name')]",
+            "apiVersion": "2016-08-01",
+            "location": "East US",
+            "scale": null,
+            "properties": {
+                "enabled": true,
+                "hostNameSslStates": [
+                    {
+                        "name": "[concat(parameters('sites_di_layer_name'),'.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "virtualIP": null,
+                        "thumbprint": null,
+                        "toUpdate": null,
+                        "hostType": "Standard"
+                    },
+                    {
+                        "name": "[concat(parameters('sites_di_layer_name'),'.scm.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "virtualIP": null,
+                        "thumbprint": null,
+                        "toUpdate": null,
+                        "hostType": "Repository"
+                    }
+                ],
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_app_svc_name'))]",
+                "reserved": true,
+                "siteConfig": { 
+                    "appSettings": [
+        {
+          "name": "DOCKER_REGISTRY_SERVER_USERNAME",
+          "value": "[parameters('docker_registery_server_name')]"
+        },
+        {
+            "name":"DOCKER_REGISTRY_SERVER_PASSWORD",
+            "value": "[parameters('docker_registery_server_password')]"
+        },
+        {
+            "name":"DOCKER_REGISTRY_SERVER_URL",
+            "value":"[parameters('docker_registery_server_url')]"
+        },
+        {
+            "name":"MINIO_ACCESS_KEY",
+            "value":"[parameters('minio_access_key')]"
+        },
+        {
+            "name":"MINIO_SECRET_KEY",
+            "value":"[parameters('minio_secret_key')]"
+        }
+      ],
+    "azureStorageAccounts": {
+           "config1": {
+                        "type": "AzureBlob",
+                        "accountName": "[parameters('storageAccounts_name')]",
+                        "shareName": "[parameters('customer_config_blob_container_name')]",
+                        "accessKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_name')), providers('Microsoft.Storage', 'storageAccounts').apiVersions[0]).keys[0].value]",
+                        "mountPath": "/root/.minio"
+                    },
+                    "data1": {
+                        "type": "AzureBlob",
+                        "accountName": "[parameters('storageAccounts_name')]",
+                        "shareName": "[parameters('customer_data_blob_container_name')]",
+                        "accessKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_name')), providers('Microsoft.Storage', 'storageAccounts').apiVersions[0]).keys[0].value]",
+                        "mountPath": "/data"
+                    }
+
+    }
+                },
+                "scmSiteAlsoStopped": false,
+                "hostingEnvironmentProfile": null,
+                "clientAffinityEnabled": true,
+                "clientCertEnabled": false,
+                "hostNamesDisabled": false,
+                "containerSize": 0,
+                "dailyMemoryTimeQuota": 0,
+                "cloningInfo": null,
+                "httpsOnly": false
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_app_svc_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Web/sites/config",
+            "name": "[concat(parameters('sites_di_layer_name'), '/', parameters('config_web_name'))]",
+            "apiVersion": "2016-08-01",
+            "location": "East US",
+            "properties": {
+                "numberOfWorkers": 1,
+                "linuxFxVersion": "DOCKER|fancy.azurecr.io/minio:latest",
+                "requestTracingEnabled": false,
+                "remoteDebuggingEnabled": false,
+                "httpLoggingEnabled": true,
+                "logsDirectorySizeLimit": 35,
+                "detailedErrorLoggingEnabled": false,
+                "webSocketsEnabled": false,
+                "alwaysOn": true
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('sites_di_layer_name'))]"
+            ]
+        }
+    ]
+}
