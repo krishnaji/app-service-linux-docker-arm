@@ -2,12 +2,16 @@
     "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "sites_di_layer_name": {
+        "site_name": {
             "defaultValue": "<updateme>",
             "type": "String"
         },
         "config_web_name": {    
             "defaultValue": "web",
+            "type": "String"
+        },
+        "site_slot_name": {
+            "defaultValue": "dev",
             "type": "String"
         },
         "storageAccounts_name": {
@@ -30,21 +34,9 @@
              "type": "String",
             "defaultValue":"<updateme>"
         },
-          "minio_access_key":{
-            "type": "String",
-            "defaultValue":"<updateme>"
-        },
-        "minio_secret_key":{
+        "diagnostic_blob_container_name":{
              "type": "String",
             "defaultValue":"<updateme>"
-        },
-        "customer_data_blob_container_name":{
-             "type": "String",
-            "defaultValue":"<updateme>"
-        },
-         "customer_config_blob_container_name":{
-             "type": "String",
-             "defaultValue":"<updateme>"
         }
     },
     "variables": {},
@@ -82,18 +74,7 @@
             },
             "resources": [
                 {
-                    "name": "[concat('default/', parameters('customer_config_blob_container_name'))]",
-                    "type": "blobServices/containers",
-                    "apiVersion": "2018-07-01",
-                    "properties":{
-                        "publicAccess":"None"
-                    },
-                    "dependsOn": [
-                        "[parameters('storageAccounts_name')]"
-                    ]
-                },
-                {
-                    "name": "[concat('default/', parameters('customer_data_blob_container_name'))]",
+                    "name": "[concat('default/', parameters('diagnostic_blob_container_name'))]",
                     "type": "blobServices/containers",
                     "apiVersion": "2018-07-01",
                     "properties":{
@@ -109,10 +90,10 @@
         {
             "type": "Microsoft.Web/serverfarms",
             "sku": {
-                "name": "B1",
-                "tier": "Basic",
-                "size": "B1",
-                "family": "B",
+                "name": "S1",
+                "tier": "Standard",
+                "size": "S1",
+                "family": "S",
                 "capacity": 1
             },
             "kind": "linux",
@@ -128,30 +109,11 @@
         {
             "type": "Microsoft.Web/sites",
             "kind": "app,linux,container",
-            "name": "[parameters('sites_di_layer_name')]",
+            "name": "[parameters('site_name')]",
             "apiVersion": "2016-08-01",
             "location": "East US",
-            "scale": null,
             "properties": {
                 "enabled": true,
-                "hostNameSslStates": [
-                    {
-                        "name": "[concat(parameters('sites_di_layer_name'),'.azurewebsites.net')]",
-                        "sslState": "Disabled",
-                        "virtualIP": null,
-                        "thumbprint": null,
-                        "toUpdate": null,
-                        "hostType": "Standard"
-                    },
-                    {
-                        "name": "[concat(parameters('sites_di_layer_name'),'.scm.azurewebsites.net')]",
-                        "sslState": "Disabled",
-                        "virtualIP": null,
-                        "thumbprint": null,
-                        "toUpdate": null,
-                        "hostType": "Repository"
-                    }
-                ],
                 "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_app_svc_name'))]",
                 "reserved": true,
                 "siteConfig": { 
@@ -167,43 +129,10 @@
         {
             "name":"DOCKER_REGISTRY_SERVER_URL",
             "value":"[parameters('docker_registery_server_url')]"
-        },
-        {
-            "name":"MINIO_ACCESS_KEY",
-            "value":"[parameters('minio_access_key')]"
-        },
-        {
-            "name":"MINIO_SECRET_KEY",
-            "value":"[parameters('minio_secret_key')]"
         }
-      ],
-    "azureStorageAccounts": {
-           "config1": {
-                        "type": "AzureBlob",
-                        "accountName": "[parameters('storageAccounts_name')]",
-                        "shareName": "[parameters('customer_config_blob_container_name')]",
-                        "accessKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_name')), providers('Microsoft.Storage', 'storageAccounts').apiVersions[0]).keys[0].value]",
-                        "mountPath": "/root/.minio"
-                    },
-                    "data1": {
-                        "type": "AzureBlob",
-                        "accountName": "[parameters('storageAccounts_name')]",
-                        "shareName": "[parameters('customer_data_blob_container_name')]",
-                        "accessKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_name')), providers('Microsoft.Storage', 'storageAccounts').apiVersions[0]).keys[0].value]",
-                        "mountPath": "/data"
-                    }
-
-    }
-                },
-                "scmSiteAlsoStopped": false,
-                "hostingEnvironmentProfile": null,
-                "clientAffinityEnabled": true,
-                "clientCertEnabled": false,
-                "hostNamesDisabled": false,
-                "containerSize": 0,
-                "dailyMemoryTimeQuota": 0,
-                "cloningInfo": null,
-                "httpsOnly": false
+      ]
+     },
+                "httpsOnly": true
             },
             "dependsOn": [
                 "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_app_svc_name'))]"
@@ -211,22 +140,32 @@
         },
         {
             "type": "Microsoft.Web/sites/config",
-            "name": "[concat(parameters('sites_di_layer_name'), '/', parameters('config_web_name'))]",
+            "name": "[concat(parameters('site_name'), '/', parameters('config_web_name'))]",
             "apiVersion": "2016-08-01",
             "location": "East US",
             "properties": {
                 "numberOfWorkers": 1,
-                "linuxFxVersion": "DOCKER|fancy.azurecr.io/minio:latest",
-                "requestTracingEnabled": false,
-                "remoteDebuggingEnabled": false,
+                "linuxFxVersion": "[concat('COMPOSE','|','<base64ecodedyamlfile>')]",
                 "httpLoggingEnabled": true,
                 "logsDirectorySizeLimit": 35,
-                "detailedErrorLoggingEnabled": false,
-                "webSocketsEnabled": false,
                 "alwaysOn": true
             },
             "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('sites_di_layer_name'))]"
+                "[resourceId('Microsoft.Web/sites', parameters('site_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Web/sites/slots",
+            "name": "[concat(parameters('site_name'), '/', parameters('site_slot_name'))]",
+            "apiVersion": "2016-08-01",
+            "kind": "app,linux,container",
+            "location": "East US",
+            "properties": {
+                "linuxFxVersion": "[concat('COMPOSE','|','<base64ecodedyamlfile>')]",
+                "alwaysOn": true
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('site_name'))]"
             ]
         }
     ]
